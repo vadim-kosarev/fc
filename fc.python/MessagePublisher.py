@@ -1,9 +1,11 @@
-import time
-
-import pika
-import json
 import base64
 import datetime
+import json
+import time
+from math import floor
+
+import pika
+from pika.spec import BasicProperties
 
 username = "root"
 userpass = "Password123!"
@@ -12,6 +14,7 @@ port = 5672
 vhost = "fc"
 images_exchange = "x-images-input"
 images_key = "image"
+
 
 def jsonDefaults(obj, **kwargs):
     if isinstance(obj, Message):
@@ -22,17 +25,19 @@ def jsonDefaults(obj, **kwargs):
         }
     return None
 
+
 class Message:
     def __init__(self, **kwargs):
         self.timestamp = time.time()
         self.str_datetime = ""
         self.binary = bytes([])
+        self.headers = {}
 
     def __repr__(self):
         return "Message()"
 
     def __str__(self):
-        return "timestamp={}\nbinary={}".format(self.timestamp, self.binary)
+        return "timestamp={}\nbinary={} bytes".format(self.timestamp, len(self.binary))
 
 
 class RabbitMQClient:
@@ -51,9 +56,13 @@ class RabbitMQClient:
         return
 
     def publishMessage(self, msg):
+        props = BasicProperties(
+            headers=msg.headers
+        )
         self.channel.basic_publish(
             exchange=images_exchange,
             routing_key=images_key,
+            properties=props,
             body=json.dumps(
                 msg,
                 ensure_ascii=True,
@@ -61,8 +70,11 @@ class RabbitMQClient:
                 default=jsonDefaults)
         )
 
-    def publishFrame(self, binary):
+    def publishFrame(self, binary, headers=None):
         msg = Message()
         msg.timestamp = time.time()
+        msg.str_datetime = datetime.datetime.fromtimestamp(msg.timestamp)
+        msg.headers = headers
+        msg.headers['timestamp'] = str(int(msg.timestamp))
         msg.binary = binary
         self.publishMessage(msg)
