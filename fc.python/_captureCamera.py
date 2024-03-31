@@ -6,12 +6,14 @@ import cv2 as cv2
 
 from MessagePublisher import RabbitMQClient
 
-parser = argparse.ArgumentParser(description='...')
+parser = argparse.ArgumentParser(
+    description='Captures video stream and sends each frame '
+                'to RabbitMQ')
 parser.add_argument(
     "--cam",
     type=int,
     default=0,
-    help="Camera Index: 0,1,2,...")
+    help="System camera Index: 0,1,2,...")
 parser.add_argument("--pid", type=int, help="Process ID")
 args = parser.parse_args()
 
@@ -25,8 +27,8 @@ capture = cv2.VideoCapture(
     cameraIndex,
     cv2.CAP_ANY,
     [
-        cv2.CAP_PROP_FRAME_WIDTH, 1280,
-        cv2.CAP_PROP_FRAME_HEIGHT, 720
+        # cv2.CAP_PROP_FRAME_WIDTH, 1280,
+        # cv2.CAP_PROP_FRAME_HEIGHT, 720
     ]
 )
 

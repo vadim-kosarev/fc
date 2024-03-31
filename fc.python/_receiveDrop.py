@@ -1,6 +1,4 @@
 import argparse
-import base64
-import json
 import logging.config
 import os
 import sys
@@ -8,19 +6,19 @@ import time
 
 from MessagePublisher import RabbitMQClient
 
-parser = argparse.ArgumentParser(description='...')
+parser = argparse.ArgumentParser(
+    description='Receives messages from RabbitMQ and drops em')
 parser.add_argument(
     "--qname",
     type=str,
     default="q-input-images",
-    help="Queue name")
+    help="Queue name (str)")
 parser.add_argument(
     "--delay",
     type=float,
     default=0.01,
-    help="Delay time, sec")
+    help="Delay time (float), sec")
 args = parser.parse_args()
-
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger(__name__)
@@ -30,7 +28,6 @@ cnt = 0
 
 
 def main():
-
     def processMessage(ch, method, properties, body):
         try:
             headers = properties.headers

@@ -8,22 +8,24 @@ import time
 
 from MessagePublisher import RabbitMQClient
 
-parser = argparse.ArgumentParser(description='...')
+parser = argparse.ArgumentParser(
+    description='Receives messages from RabbitMQ, decodes frame from each one and '
+                'processes them recognizing faces on the frame')
 parser.add_argument(
     "--pid",
     type=int,
     default=0,
-    help="Process ID")
+    help="Process Meta ID (int) to mark data")
 parser.add_argument(
     "--fnum",
     type=int,
     default=10,
-    help="Frames number")
+    help="Frames number (int)")
 parser.add_argument(
     "--qname",
     type=str,
     default="q-input-images",
-    help="Queue name")
+    help="Queue name (str)")
 args = parser.parse_args()
 
 logging.config.fileConfig("logging.conf")
