@@ -69,12 +69,13 @@ class FacesImageProcessor:
                     detections[0, 0, i, 5], detections[0, 0, i, 6]
                 ]) != ProcResult.OK):
                     logger.info("OUT_OF_BOUNDS... %d", i)
-                x1 = int(detections[0, 0, i, 3] * imageWidth)
-                y1 = int(detections[0, 0, i, 4] * imageHeight)
-                x2 = int(detections[0, 0, i, 5] * imageWidth)
-                y2 = int(detections[0, 0, i, 6] * imageHeight)
-                logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
-                faceBoxes.append(((x1, y1), (x2, y2)))
+                else:
+                    x1 = int(detections[0, 0, i, 3] * imageWidth)
+                    y1 = int(detections[0, 0, i, 4] * imageHeight)
+                    x2 = int(detections[0, 0, i, 5] * imageWidth)
+                    y2 = int(detections[0, 0, i, 6] * imageHeight)
+                    # logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
+                    faceBoxes.append(((x1, y1), (x2, y2)))
             else:
                 break
 
@@ -89,16 +90,16 @@ class FacesImageProcessor:
             image
         )
 
-        blob2 = cv2.dnn.blobFromImage(
-            image
-            , scalefactor=1.
-            , size=(300, 300)
-            , mean=[104, 117, 123],
-            swapRB=False, crop=False
-        )
+        # blob2 = cv2.dnn.blobFromImage(
+        #     image
+        #     , scalefactor=1.
+        #     , size=(300, 300)
+        #     , mean=[104, 117, 123],
+        #     swapRB=False, crop=False
+        # )
 
         (res1, faceBoxes1) = self.processBlob(blob1, image.shape)
-        (res2, faceBoxes2) = self.processBlob(blob2, image.shape)
+        # (res2, faceBoxes2) = self.processBlob(blob2, image.shape)
 
         return faceBoxes1 + faceBoxes2
 
