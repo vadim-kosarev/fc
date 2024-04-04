@@ -1,5 +1,6 @@
 import argparse
 import logging.config
+import random
 import socket
 
 import cv2 as cv2
@@ -57,7 +58,8 @@ while True:
     publisher.publishFrame(frameJpeg, headers={
         "source": "Camera:{}".format(cameraIndex),
         "hostname": socket.gethostname(),
-        "frameNo": str(frameNo)
+        "frameNo": str(frameNo),
+        "localId": str(random.randint(1000000,9999999))
     })
 
     if (cv2.waitKey(1) == ord('q')):
