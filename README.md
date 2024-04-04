@@ -16,3 +16,5 @@ python -m pip install numpy --upgrade
 ```
 python -m pip install pika --upgrade
 ```
+5. Install dlib
+6. Install face_recognition
