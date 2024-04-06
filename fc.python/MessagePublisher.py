@@ -1,9 +1,9 @@
 import argparse
 import base64
 import configparser
-import datetime
 import json
 import logging.config
+import math
 import random
 import socket
 import time
@@ -47,9 +47,15 @@ args = parser.parse_args()
 def jsonDefaults(obj, **kwargs):
     if isinstance(obj, Message):
         return {
-            "timestamp": obj.timestamp,
-            "str_datetime": str(datetime.datetime.fromtimestamp(obj.timestamp)),
-            "binary": base64.b64encode(obj.binary).decode("utf-8")
+            "file": obj.file
+        }
+    if isinstance(obj, MessageFile):
+        return {
+            # "timestamp": obj.timestamp,
+            # "str_datetime": str(datetime.datetime.fromtimestamp(obj.timestamp)),
+            # "binary": base64.b64encode(obj.binary).decode("utf-8")
+            "mime": obj.mime,
+            "data": base64.b64encode(obj.binary).decode("utf-8")
         }
     return None
 
@@ -93,6 +99,7 @@ class RabbitMQClient(MQClient):
 
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._credentials = pika.credentials.PlainCredentials(
             username=config.get(SECT_BROKER, KEY_USERNAME),
             password=config.get(SECT_BROKER, KEY_PASSWORD))
@@ -107,43 +114,44 @@ class RabbitMQClient(MQClient):
         return
 
     # ------------------------------------------------------------------------------------------------------------------
-    def publishMessage(self, msg):
+    def publishMessage(self, message):
         props = BasicProperties(
-            headers=msg.headers
+            headers=message.headers
         )
+        sBody = json.dumps(
+            message,
+            ensure_ascii=True,
+            indent=2,
+            default=jsonDefaults)
         self._channel.basic_publish(
             exchange=config.get(SECT_BROKER, KEY_IMAGES_EXCHANGE),
             routing_key=config.get(SECT_BROKER, KEY_IMAGES_ROUTING_KEY),
             properties=props,
-            body=json.dumps(
-                msg,
-                ensure_ascii=True,
-                indent=2,
-                default=jsonDefaults)
+            body=sBody
         )
 
     # ------------------------------------------------------------------------------------------------------------------
-    def publishFrame(self, binary, headers=None):
-        msg = Message()
-        msg.timestamp = time.time()
-        msg.str_datetime = datetime.datetime.fromtimestamp(msg.timestamp)
-        msg.headers = headers
-        msg.headers['timestamp'] = str(int(msg.timestamp))
-        msg.binary = binary
-        self.publishMessage(msg)
+    # def publishFrame(self, binary, headers=None):
+    #     msg = Message()
+    #     msg.timestamp = time.time()
+    #     msg.str_datetime = datetime.datetime.fromtimestamp(msg.timestamp)
+    #     msg.headers = headers
+    #     msg.headers['timestamp'] = str(int(msg.timestamp))
+    #     msg.binary = binary
+    #     self.publishMessage(msg)
 
 
 # ======================================================================================================================
-if ("__main__" == __name__):
+if "__main__" == __name__:
     logger.info("__main__ started")
     mqBroker = RabbitMQClient()
     logger.info("MQ BROKER: %s", config.get(SECT_BROKER, KEY_MESSAGE_BROKER_NAME))
     logger.info("Created: %s", mqBroker)
     logger.info("Publishing %s", args.file)
 
-    fstr = open(args.file, 'rb')
-    byteArray = fstr.read()
-    fstr.close()
+    fs = open(args.file, 'rb')
+    byteArray = fs.read()
+    fs.close()
     msgFile = MessageFile(mime="image/jpg", binary=byteArray)
 
     logger.info("Publishing %s of %d bytes", msgFile.mime, len(msgFile.binary))
@@ -154,9 +162,11 @@ if ("__main__" == __name__):
         "source": args.file,
         "frameNo": random.randint(0, 1000),
         "localID": random.randint(100000, 999999),
-        "timestamp": now - random.randint(0, 60000),
-        "brokerTimestamp": now
+        "timestamp": math.floor(now - random.randint(0, 60000)),
+        "brokerTimestamp": math.floor(now)
     }
 
     msg = Message(headers=msgHeaders, file=msgFile)
     logger.info("msg: %s", msg)
+
+    mqBroker.publishMessage(msg)
