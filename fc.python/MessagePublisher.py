@@ -25,6 +25,7 @@ KEY_VHOST = "vhost"
 KEY_IMAGES_EXCHANGE = "images_exchange"
 KEY_IMAGES_ROUTING_KEY = "images_routing_key"
 KEY_MESSAGE_BROKER_NAME = "message_broker_name"
+KEY_MESSAGE_BROKER_CLASS = "message_broker_class"
 
 # ------------------------------------------------------------------------------------------------
 logging.config.fileConfig("logging.conf")
@@ -43,59 +44,81 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-# ----------------------------------------------------------------------------------------------------------------------
-def jsonDefaults(obj, **kwargs):
-    if isinstance(obj, Message):
-        return {
-            "file": obj.file
-        }
-    if isinstance(obj, MessageFile):
-        return {
-            # "timestamp": obj.timestamp,
-            # "str_datetime": str(datetime.datetime.fromtimestamp(obj.timestamp)),
-            # "binary": base64.b64encode(obj.binary).decode("utf-8")
-            "mime": obj.mime,
-            "data": base64.b64encode(obj.binary).decode("utf-8")
-        }
-    return None
+# ======================================================================================================================
+class MessageFile:
+    _binary = None
+    _binaryStr = None
+
+    def _calculateBinaryStr(self):
+        self._binaryStr = base64.b64encode(self._binary).decode("utf-8")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def __init__(self, mime, binary, **kwargs):
+        self.mime = mime
+        self.setBinary(binary)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def __str__(self):
+        return "Mime: {}, Lenght: {} bytes".format(self.mime, len(self._binary))
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def setBinary(self, binary):
+        self._binary = binary
+        self._calculateBinaryStr()
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def getBinraryStr(self):
+        return self._binaryStr
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def getBinary(self):
+        return self._binary
 
 
 # ======================================================================================================================
-class MessageFile:
-    def __init__(self, mime, binary, **kwargs):
-        self.mime = mime
-        self.binary = binary
-
-    def __str__(self):
-        return "Mime: {}, Lenght: {} bytes".format(self.mime, len(self.binary))
-
-
 class Message:
+    # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, headers, file, **kwargs):
         self.headers = headers
         self.file = file
 
+    # ------------------------------------------------------------------------------------------------------------------
     def __repr__(self):
         return self.__str__()
 
+    # ------------------------------------------------------------------------------------------------------------------
     def __str__(self):
         return "\nHeaders= {}\nfile= {}".format(self.headers, self.file)
+
+    # ----------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def jsonSerialize(obj, **kwargs):
+        if isinstance(obj, Message):
+            return {
+                "file": obj.file
+            }
+        if isinstance(obj, MessageFile):
+            return {
+                "mime": obj.mime,
+                "data": obj.getBinraryStr()
+            }
+        return None
 
 
 # ======================================================================================================================
 class MQClient:
+    # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, **kwargs):
-        logger.info("Created")
+        self.description = config.get(SECT_BROKER, KEY_MESSAGE_BROKER_NAME)
+        logger.info("Created: %s", self.description)
 
+    # ------------------------------------------------------------------------------------------------------------------
     def publishMessage(self, msg):
         return
 
 
 # ======================================================================================================================
 class RabbitMQClient(MQClient):
-    _credentials = None
-    _connection = None
-    _channel = None
 
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, **kwargs):
@@ -122,7 +145,7 @@ class RabbitMQClient(MQClient):
             message,
             ensure_ascii=True,
             indent=2,
-            default=jsonDefaults)
+            default=Message.jsonSerialize)
         self._channel.basic_publish(
             exchange=config.get(SECT_BROKER, KEY_IMAGES_EXCHANGE),
             routing_key=config.get(SECT_BROKER, KEY_IMAGES_ROUTING_KEY),
@@ -130,31 +153,36 @@ class RabbitMQClient(MQClient):
             body=sBody
         )
 
+
+# ======================================================================================================================
+class KafkaClient(MQClient):
+
     # ------------------------------------------------------------------------------------------------------------------
-    # def publishFrame(self, binary, headers=None):
-    #     msg = Message()
-    #     msg.timestamp = time.time()
-    #     msg.str_datetime = datetime.datetime.fromtimestamp(msg.timestamp)
-    #     msg.headers = headers
-    #     msg.headers['timestamp'] = str(int(msg.timestamp))
-    #     msg.binary = binary
-    #     self.publishMessage(msg)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        logger.info("Created")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def publishMessage(self, msg):
+        logger.info("publishMessage")
+        super().publishMessage(msg)
 
 
 # ======================================================================================================================
 if "__main__" == __name__:
     logger.info("__main__ started")
-    mqBroker = RabbitMQClient()
-    logger.info("MQ BROKER: %s", config.get(SECT_BROKER, KEY_MESSAGE_BROKER_NAME))
+
+    mqBroker = globals()[config.get(SECT_BROKER, KEY_MESSAGE_BROKER_CLASS)]()  # !!! -----------------------------------
+
     logger.info("Created: %s", mqBroker)
     logger.info("Publishing %s", args.file)
 
     fs = open(args.file, 'rb')
     byteArray = fs.read()
     fs.close()
-    msgFile = MessageFile(mime="image/jpg", binary=byteArray)
+    msgFile = MessageFile(mime="image/jpg", binary=byteArray)  # !!! ---------------------------------------------------
 
-    logger.info("Publishing %s of %d bytes", msgFile.mime, len(msgFile.binary))
+    logger.info("Publishing %s of %d bytes", msgFile.mime, len(msgFile.getBinary()))
 
     now = time.time()
     msgHeaders = {
@@ -166,7 +194,7 @@ if "__main__" == __name__:
         "brokerTimestamp": math.floor(now)
     }
 
-    msg = Message(headers=msgHeaders, file=msgFile)
+    msg = Message(headers=msgHeaders, file=msgFile)  # !!! -------------------------------------------------------------
     logger.info("msg: %s", msg)
 
-    mqBroker.publishMessage(msg)
+    mqBroker.publishMessage(msg)  # !!! --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import base64
 import json
 
-from MessagePublisher import jsonDefaults, RabbitMQClient, Message
+from MessagePublisher import jsonSerialize, RabbitMQClient, Message
 
 # ----------------------------------------------------------------------------------
 msg = Message()
@@ -12,7 +12,7 @@ print(json.dumps(
     msg,
     ensure_ascii=True,
     indent=2,
-    default=jsonDefaults))
+    default=jsonSerialize))
 # ----------------------------------------------------------------------------------
 
 publisher = RabbitMQClient()
