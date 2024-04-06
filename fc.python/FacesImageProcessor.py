@@ -18,15 +18,10 @@ parser.add_argument(
     default="out/input.jpg",
     help="source file")
 parser.add_argument(
-    "--prototxt",
+    "--suffix",
     type=str,
-    default="github.com/gopinath-balu/computer_vision/CAFFE_DNN/deploy.prototxt.txt",
-    help="deploy.prototxt.txt")
-parser.add_argument(
-    "--caffeModel",
-    type=str,
-    default="github.com/gopinath-balu/computer_vision/CAFFE_DNN/res10_300x300_ssd_iter_140000.caffemodel",
-    help="res10_300x300_ssd_iter_140000.caffemodel")
+    default="_dnn.jpeg",
+    help="outfile suffix")
 args = parser.parse_args()
 
 
@@ -44,15 +39,18 @@ def check01(fArr):
             return ProcResult.OUT_OF_BOUNDS
     return ProcResult.OK
 
-
+# ----------------------------------------------------------------------------------------------------------------------
 class FacesImageProcessor:
     _faceDetector = None
+    _prototxt = "github.com/gopinath-balu/computer_vision/CAFFE_DNN/deploy.prototxt.txt"
+    _caffemodel ="github.com/gopinath-balu/computer_vision/CAFFE_DNN/res10_300x300_ssd_iter_140000.caffemodel"
 
-    def __init__(self, prototxt=args.prototxt, caffeModel=args.caffeModel, **kwargs):
-        self._faceDetector = cv2.dnn.readNetFromCaffe(prototxt, caffeModel)
+    # ------------------------------------------------------------------------------------------------------------------
+    def __init__(self, **kwargs):
+        self._faceDetector = cv2.dnn.readNetFromCaffe(self._prototxt, self._caffemodel)
 
+    # ------------------------------------------------------------------------------------------------------------------
     def processBlob(self, blob, shape):
-        # (a1, a2, imageHeight, imageWidth) = shape
         (imageHeight, imageWidth, colorBytes) = shape
         faceBoxes = []
 
@@ -68,7 +66,7 @@ class FacesImageProcessor:
                     detections[0, 0, i, 3], detections[0, 0, i, 4],
                     detections[0, 0, i, 5], detections[0, 0, i, 6]
                 ]) != ProcResult.OK):
-                    logger.info("OUT_OF_BOUNDS... %d", i)
+                    logger.warn("OUT_OF_BOUNDS... %d", i)
                 else:
                     x1 = int(detections[0, 0, i, 3] * imageWidth)
                     y1 = int(detections[0, 0, i, 4] * imageHeight)
@@ -81,6 +79,7 @@ class FacesImageProcessor:
 
         return (ProcResult.OK, faceBoxes)
 
+    # ------------------------------------------------------------------------------------------------------------------
     def processImage(self, image):
 
         faceBoxes1 = []
@@ -90,16 +89,16 @@ class FacesImageProcessor:
             image
         )
 
-        # blob2 = cv2.dnn.blobFromImage(
-        #     image
-        #     , scalefactor=1.
-        #     , size=(300, 300)
-        #     , mean=[104, 117, 123],
-        #     swapRB=False, crop=False
-        # )
+        blob2 = cv2.dnn.blobFromImage(
+            image
+            , scalefactor=1.
+            , size=(300, 300)
+            , mean=[104, 117, 123],
+            swapRB=False, crop=False
+        )
 
         (res1, faceBoxes1) = self.processBlob(blob1, image.shape)
-        # (res2, faceBoxes2) = self.processBlob(blob2, image.shape)
+        (res2, faceBoxes2) = self.processBlob(blob2, image.shape)
 
         return faceBoxes1 + faceBoxes2
 
@@ -122,7 +121,7 @@ if (__name__ == "__main__"):
         logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    cv2.imwrite(args.file + ".dnn.jpeg", image)
+    cv2.imwrite(args.file + args.suffix, image)
 
     # ------------------------------------------------------------------------------------------------------------------
 if (__name__ == "__main0__"):
