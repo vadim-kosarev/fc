@@ -61,12 +61,12 @@ class FacesImageProcessor:
 
         for i in range(0, detCount):
             detection = detections[0, 0, i, 2]
-            if (detection > 0.5):
+            if (detection > 0.85):
                 if (check01([
                     detections[0, 0, i, 3], detections[0, 0, i, 4],
                     detections[0, 0, i, 5], detections[0, 0, i, 6]
                 ]) != ProcResult.OK):
-                    logger.warn("OUT_OF_BOUNDS... %d", i)
+                    logger.warning("OUT_OF_BOUNDS... %d", i)
                 else:
                     x1 = int(detections[0, 0, i, 3] * imageWidth)
                     y1 = int(detections[0, 0, i, 4] * imageHeight)
