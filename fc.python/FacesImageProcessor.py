@@ -70,7 +70,7 @@ class FacesImageProcessor:
                     detections[0, 0, i, 3], detections[0, 0, i, 4],
                     detections[0, 0, i, 5], detections[0, 0, i, 6]
                 ]) != ProcResult.OK):
-                    logger.warning("OUT_OF_BOUNDS... %d", i)
+                    logger.warning("OUT_OF_BOUNDS... %d - %f", i, detection)
                 else:
                     x1 = int(detections[0, 0, i, 3] * imageWidth)
                     y1 = int(detections[0, 0, i, 4] * imageHeight)
@@ -129,7 +129,7 @@ if (__name__ == "__main__"):
 
     for face in faceBoxes:
         (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
-        logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
+        # logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     cv2.imwrite(args.file + args.suffix, image)
@@ -137,7 +137,7 @@ if (__name__ == "__main__"):
     sBody = json.dumps(
         faceBoxes,
         ensure_ascii=True,
-        indent=2,
+        # indent=0,
         default=FaceDetection.jsonSerialize
     )
     logger.info(sBody)

@@ -14,8 +14,8 @@ public class SimpleCmdRunner implements CommandLineRunner{
     public void run(String... args) throws Exception {
         logger.info("Running cmd application");
         for (String s : args) {
-            logger.info("arg: {}", s);
+//            logger.info("arg: {}", s);
         }
-        logger.info("Finishing...");
+//        logger.info("Finishing...");
     }
 }

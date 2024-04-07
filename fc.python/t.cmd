@@ -1,5 +1,5 @@
 @echo off
-set d=out3
+set d=out
 set suffix=_dnn.300x.jpeg
 
 for /F %%F in ('dir /B %d%\*.jpg') do (
