@@ -1,5 +1,4 @@
 import argparse
-import base64
 import configparser
 import json
 import logging.config
@@ -10,6 +9,8 @@ import time
 
 import pika
 from pika.spec import BasicProperties
+
+from DataStruct import *
 
 # ------------------------------------------------------------------------------------------------
 config = configparser.ConfigParser()
@@ -42,110 +43,6 @@ parser.add_argument(
     default="../data/dflt_image.jpg",
     help="Source file")
 args = parser.parse_args()
-
-
-# ======================================================================================================================
-
-class DataValidState:
-    def __init__(self, **kwargs):
-        self._isValid = False
-
-    def isValid(self):
-        return self._isValid
-
-    def invalidate(self):
-        self._isValid = False
-
-    def ensureValid(self):
-        if not self.isValid():
-            self.calculate()
-        self._isValid = True
-
-    def calculate(self):
-        return
-
-class MessageFile (DataValidState):
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, mime, binary, **kwargs):
-        super().__init__(**kwargs)
-        self._mime = mime
-        self._binary = binary
-        self._isValid = False
-        self._binaryStr = None
-        self.invalidate()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __str__(self):
-        return "Mime: {}, Lenght: {} bytes".format(self._mime, len(self._binary))
-
-    def calculate(self):
-        self._binaryStr = base64.b64encode(self._binary).decode("utf-8")
-
-    def getMime(self):
-        return self._mime
-
-    def getBinary(self):
-        return self._binary
-
-    def setBinary(self, binary):
-        self._binary = binary
-        self.invalidate()
-
-    def getBinaryStr(self):
-        self.ensureValid()
-        return self._binaryStr
-
-
-# ======================================================================================================================
-class Message (DataValidState):
-    # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, headers, file, **kwargs):
-        super().__init__(**kwargs)
-        self.headers = headers
-        self.file = file
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __repr__(self):
-        return self.__str__()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __str__(self):
-        return "\nHeaders= {}\nfile= {}".format(self.headers, self.file)
-
-    # ----------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def jsonSerialize(obj, **kwargs):
-        if isinstance(obj, Message):
-            return {
-                "file": obj.file
-            }
-        if isinstance(obj, MessageFile):
-            return {
-                "mime": obj.getMime(),
-                "data": obj.getBinaryStr()
-            }
-        return None
-
-    def escapeHeader(self, strArg):
-        if str is None:
-            return "UNDEF"
-        strArg = str(strArg)
-        strArg = strArg.replace(":", "_#_")
-        strArg = strArg.replace("..", "_")
-        strArg = strArg.replace("\\", "/")
-        strArg = strArg.replace("//", "/")
-        return strArg
-
-    def calculate(self):
-        s3Path = "local/jpgdata/{}/{}/frame_{}_{}_{}.jpg".format(
-            self.escapeHeader(self.headers["hostname"]),
-            self.escapeHeader(self.headers["source"]),
-            self.escapeHeader(self.headers["timestamp"]),
-            self.escapeHeader(self.headers["frameNo"]),
-            self.escapeHeader(self.headers["localID"])
-        )
-        self.headers['frameStoragePath'] = s3Path
 
 
 # ======================================================================================================================

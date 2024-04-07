@@ -1,8 +1,11 @@
 import argparse
 import enum
+import json
 import logging.config
 
 import cv2
+
+from DataStruct import *
 
 # ------------------------------------------------------------------------------------------------
 logging.config.fileConfig("logging.conf")
@@ -39,11 +42,12 @@ def check01(fArr):
             return ProcResult.OUT_OF_BOUNDS
     return ProcResult.OK
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 class FacesImageProcessor:
     _faceDetector = None
     _prototxt = "github.com/gopinath-balu/computer_vision/CAFFE_DNN/deploy.prototxt.txt"
-    _caffemodel ="github.com/gopinath-balu/computer_vision/CAFFE_DNN/res10_300x300_ssd_iter_140000.caffemodel"
+    _caffemodel = "github.com/gopinath-balu/computer_vision/CAFFE_DNN/res10_300x300_ssd_iter_140000.caffemodel"
 
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, **kwargs):
@@ -73,7 +77,13 @@ class FacesImageProcessor:
                     x2 = int(detections[0, 0, i, 5] * imageWidth)
                     y2 = int(detections[0, 0, i, 6] * imageHeight)
                     # logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
-                    faceBoxes.append(((x1, y1), (x2, y2)))
+                    # faceBoxes.append(((x1, y1), (x2, y2)))
+
+                    fd = FaceDetection()
+                    fd.detection = detection
+                    fd.faceBox = FaceBox(Pnt(x1, y1), Pnt(x2, y2))
+                    faceBoxes.append(fd)
+
             else:
                 break
 
@@ -102,6 +112,7 @@ class FacesImageProcessor:
 
         return faceBoxes1 + faceBoxes2
 
+
 # ------------------------------------------------------------------------------------------------
 if (__name__ == "__main__"):
     logger.info("Started")
@@ -116,14 +127,22 @@ if (__name__ == "__main__"):
     faceBoxes = faceImageProcessor.processImage(image)
     logger.info("Detection count: %d", len(faceBoxes))
 
-    for faceBox in faceBoxes:
-        (x1, y1), (x2, y2) = faceBox
+    for face in faceBoxes:
+        (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
         logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     cv2.imwrite(args.file + args.suffix, image)
 
-    # ------------------------------------------------------------------------------------------------------------------
+    sBody = json.dumps(
+        faceBoxes,
+        ensure_ascii=True,
+        indent=2,
+        default=FaceDetection.jsonSerialize
+    )
+    logger.info(sBody)
+
+# ------------------------------------------------------------------------------------------------------------------
 if (__name__ == "__main0__"):
 
     logger.info("Started")
@@ -137,9 +156,9 @@ if (__name__ == "__main0__"):
     logger.info("Image: %d x %d", imageWidth, imageHeight)
     blob = cv2.dnn.blobFromImage(
         image
-        ,scalefactor=1.
-        ,size=(300,300)
-        ,mean=[104, 117, 123],
+        , scalefactor=1.
+        , size=(300, 300)
+        , mean=[104, 117, 123],
         swapRB=False, crop=False
     )
 
