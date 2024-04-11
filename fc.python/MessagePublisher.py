@@ -1,5 +1,4 @@
 import argparse
-import base64
 import configparser
 import json
 import logging.config
@@ -10,6 +9,8 @@ import time
 
 import pika
 from pika.spec import BasicProperties
+
+from DataStruct import *
 
 # ------------------------------------------------------------------------------------------------
 config = configparser.ConfigParser()
@@ -45,67 +46,6 @@ args = parser.parse_args()
 
 
 # ======================================================================================================================
-class MessageFile:
-    _binary = None
-    _binaryStr = None
-
-    def _calculateBinaryStr(self):
-        self._binaryStr = base64.b64encode(self._binary).decode("utf-8")
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, mime, binary, **kwargs):
-        self.mime = mime
-        self.setBinary(binary)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __str__(self):
-        return "Mime: {}, Lenght: {} bytes".format(self.mime, len(self._binary))
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def setBinary(self, binary):
-        self._binary = binary
-        self._calculateBinaryStr()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def getBinraryStr(self):
-        return self._binaryStr
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def getBinary(self):
-        return self._binary
-
-
-# ======================================================================================================================
-class Message:
-    # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, headers, file, **kwargs):
-        self.headers = headers
-        self.file = file
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __repr__(self):
-        return self.__str__()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def __str__(self):
-        return "\nHeaders= {}\nfile= {}".format(self.headers, self.file)
-
-    # ----------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def jsonSerialize(obj, **kwargs):
-        if isinstance(obj, Message):
-            return {
-                "file": obj.file
-            }
-        if isinstance(obj, MessageFile):
-            return {
-                "mime": obj.mime,
-                "data": obj.getBinraryStr()
-            }
-        return None
-
-
-# ======================================================================================================================
 class MQClient:
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, **kwargs):
@@ -138,6 +78,7 @@ class RabbitMQClient(MQClient):
 
     # ------------------------------------------------------------------------------------------------------------------
     def publishMessage(self, message):
+        message.ensureValid()
         props = BasicProperties(
             headers=message.headers
         )
@@ -182,7 +123,7 @@ if "__main__" == __name__:
     fs.close()
     msgFile = MessageFile(mime="image/jpg", binary=byteArray)  # !!! ---------------------------------------------------
 
-    logger.info("Publishing %s of %d bytes", msgFile.mime, len(msgFile.getBinary()))
+    logger.info("Publishing %s of %d bytes", msgFile.getMime(), len(msgFile.getBinary()))
 
     now = time.time()
     msgHeaders = {
