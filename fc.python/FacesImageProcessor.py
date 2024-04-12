@@ -1,10 +1,8 @@
 import argparse
+import cv2
 import enum
 import json
 import logging.config
-
-import cv2
-
 from DataStruct import *
 
 # ------------------------------------------------------------------------------------------------
@@ -107,7 +105,7 @@ class FacesImageProcessor:
             swapRB=False, crop=False
         )
 
-        (res1, faceBoxes1) = self.processBlob(blob1, image.shape)
+        # (res1, faceBoxes1) = self.processBlob(blob1, image.shape)
         (res2, faceBoxes2) = self.processBlob(blob2, image.shape)
 
         return faceBoxes1 + faceBoxes2
@@ -120,24 +118,29 @@ if (__name__ == "__main__"):
 
     logger.info("Processing %s", args.file)
     image = cv2.imread(args.file)
+    pnt0 = [0, 0]
 
     (imageHeight, imageWidth, colorDepth) = image.shape
     logger.info("Image: %d x %d", imageWidth, imageHeight)
 
     faceBoxes = faceImageProcessor.processImage(image)
+    for f in faceBoxes:
+        f.faceBox.p1.x += pnt0[0]
+        f.faceBox.p1.y += pnt0[0]
+        f.faceBox.p2.x += pnt0[0]
+        f.faceBox.p2.y += pnt0[0]
     logger.info("Detection count: %d", len(faceBoxes))
 
     for face in faceBoxes:
         (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
-        # logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#        cv2.rectangle(image, (0, 0), (50, 50), (0, 0, 255), 2)
 
     cv2.imwrite(args.file + args.suffix, image)
 
     sBody = json.dumps(
         faceBoxes,
         ensure_ascii=True,
-        # indent=0,
         default=FaceDetection.jsonSerialize
     )
     logger.info(sBody)
@@ -183,5 +186,6 @@ if (__name__ == "__main0__"):
             y2 = int(yy2 * imageHeight)
             logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
             cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.rectangle(image, (0, 0), (50, 50), (255, 0, 0), 2)
 
     cv2.imwrite(args.file + ".dnn.jpg", image)
