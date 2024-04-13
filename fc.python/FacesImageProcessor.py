@@ -63,10 +63,12 @@ class FacesImageProcessor:
     _faceDetector = None
     _prototxt = "github.com/gopinath-balu/computer_vision/CAFFE_DNN/deploy.prototxt.txt"
     _caffemodel = "github.com/gopinath-balu/computer_vision/CAFFE_DNN/res10_300x300_ssd_iter_140000.caffemodel"
+    _torch = "github.com/pyannote-data/openface.nn4.small2.v1.t7"
 
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, **kwargs):
         self._faceDetector = cv2.dnn.readNetFromCaffe(self._prototxt, self._caffemodel)
+        self._embedder = cv2.dnn.readNetFromTorch(self._torch)
 
     # ------------------------------------------------------------------------------------------------------------------
     def processBlob(self, blob, shape):
@@ -126,6 +128,7 @@ class FacesImageProcessor:
 
         return faceBoxes1 + faceBoxes2
 
+    # ------------------------------------------------------------------------------------------------------------------
     def processImage(self, image, pntShift):
         maxBox = (639, 460)
         (x0, y0) = pntShift
@@ -160,11 +163,27 @@ class FacesImageProcessor:
                         cv2.rectangle(crImage, (0, 0), (imgWStep, imgHStep), (255, 0, 255), 1)
                         cv2.imwrite(f"{args.file}_{label}_{args.suffix}", crImage)
 
+        i = 0
         for r in faceBoxes:
+            # 1. calculate 128-D vector
+            theFace = image[r.faceBox.p1.y:r.faceBox.p2.y, r.faceBox.p1.x:r.faceBox.p2.x]
+            theFaceBlob = cv2.dnn.blobFromImage(theFace, 1./255., (96,96), (0,0,0), swapRB=True, crop=False)
+            self._embedder.setInput(theFaceBlob)
+            faceVec = self._embedder.forward()
+
+            # logger.info(f"{args.file} faceVec: {faceVec}")
+            if (args.debug):
+                cv2.imwrite(f"{args.file}_face_{i}_{args.suffix}", theFace)
+
+            # 2. convert faceBox to parent image
             r.faceBox.p1.x += x0
             r.faceBox.p1.y += y0
             r.faceBox.p2.x += x0
             r.faceBox.p2.y += y0
+
+            r.faceVector = faceVec.tolist()[0]
+
+            i += 1
         return faceBoxes
 
 

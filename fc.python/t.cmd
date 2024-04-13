@@ -1,5 +1,5 @@
 @echo off
-set d=out4
+set d=out
 set suffix=.jpeg --debug=true
 
 for /F %%F in ('dir /B %d%\*.jpg') do (
