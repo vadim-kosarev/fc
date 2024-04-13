@@ -1,8 +1,10 @@
 import argparse
-import cv2
 import enum
 import json
 import logging.config
+
+import cv2
+
 from DataStruct import *
 
 # ------------------------------------------------------------------------------------------------
@@ -41,6 +43,14 @@ def check01(fArr):
     return ProcResult.OK
 
 
+def adjust01(val):
+    if val < 0:
+        return 0.
+    if val > 1:
+        return 1.
+    return val
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 class FacesImageProcessor:
     _faceDetector = None
@@ -64,18 +74,17 @@ class FacesImageProcessor:
         for i in range(0, detCount):
             detection = detections[0, 0, i, 2]
             if (detection > 0.85):
-                if (check01([
+                dToCheck = [
                     detections[0, 0, i, 3], detections[0, 0, i, 4],
                     detections[0, 0, i, 5], detections[0, 0, i, 6]
-                ]) != ProcResult.OK):
-                    logger.warning("OUT_OF_BOUNDS... %d - %f", i, detection)
+                ]
+                if (check01(dToCheck) != ProcResult.OK):
+                    logger.warning("OUT_OF_BOUNDS... %d - %f : %s", i, detection, dToCheck)
                 else:
-                    x1 = int(detections[0, 0, i, 3] * imageWidth)
-                    y1 = int(detections[0, 0, i, 4] * imageHeight)
-                    x2 = int(detections[0, 0, i, 5] * imageWidth)
-                    y2 = int(detections[0, 0, i, 6] * imageHeight)
-                    # logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
-                    # faceBoxes.append(((x1, y1), (x2, y2)))
+                    x1 = int(adjust01(detections[0, 0, i, 3]) * imageWidth)
+                    y1 = int(adjust01(detections[0, 0, i, 4]) * imageHeight)
+                    x2 = int(adjust01(detections[0, 0, i, 5]) * imageWidth)
+                    y2 = int(adjust01(detections[0, 0, i, 6]) * imageHeight)
 
                     fd = FaceDetection()
                     fd.detection = detection
@@ -88,7 +97,7 @@ class FacesImageProcessor:
         return (ProcResult.OK, faceBoxes)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def processImage(self, image):
+    def processImage0(self, image):
 
         faceBoxes1 = []
         faceBoxes2 = []
@@ -110,33 +119,80 @@ class FacesImageProcessor:
 
         return faceBoxes1 + faceBoxes2
 
+    def processImage(self, image, pntShift):
+        maxBox = (640, 480)
+        (x0, y0) = pntShift
+
+        (imageHeight, imageWidth, colorDepth) = image.shape
+        logger.info(f"{args.file}... processing image of size %d x %d", imageWidth, imageHeight)
+        faceBoxes = self.processImage0(image)
+
+        # ---- Crop and repeat
+        (imgWStep, imgHStep) = (int(imageWidth / 2) + 1, int(imageHeight / 2) + 1)
+        if (imageWidth > 2. * maxBox[0]) & (imageHeight > 2. * maxBox[1]):
+            for yi in range(0, imageHeight, imgHStep):
+                for xi in range(0, imageWidth, imgWStep):
+
+                    (x1, y1) = (xi, yi)
+                    (x2, y2) = (xi + imgWStep, yi + imgHStep)
+                    crImage = image[y1:y2, x1:x2]
+                    fBoxes2 = self.processImage(crImage, (x1, y1))
+                    faceBoxes += fBoxes2
+
+                    label = f"CROP_({xi}x{yi})-({x2}x{y2})"
+                    logger.info(f"{args.file} {label} : %d faceBoxes", len(fBoxes2))
+
+                    # (x1, y1) = (xi + int(0.25 * imgWStep), yi + int(0.25 * imgHStep))
+                    # (x2, y2) = (xi + int(1.25 * imgWStep), yi + int(1.25 * imgHStep))
+                    # crImage5 = image[y1:y2, x1:x2]
+                    # fBoxes5 = self.processImage(crImage5, (x1, y1))
+
+                    # fBoxes2 += fBoxes5
+                    # faceBoxes += fBoxes5
+
+                    for fbox2 in fBoxes2:
+                        (rx1, ry1) = (fbox2.faceBox.p1.x-xi, fbox2.faceBox.p1.y-yi)
+                        (rx2, ry2) = (fbox2.faceBox.p2.x-xi, fbox2.faceBox.p2.y-yi)
+                        cv2.rectangle(crImage, (rx1, ry1), (rx2, ry2), (255, 0, 0), 2)
+                        logger.info(f"{args.file} Crop file: {label} box: ({rx1}, {ry1}), ({rx2}, {ry2})")
+
+                    cv2.rectangle(crImage, (0, 0), (25, 25), (255, 0, 255), -1)
+                    cv2.rectangle(crImage, (0, 0), (imgWStep, imgHStep), (255, 0, 255), 1)
+                    cv2.imwrite(f"{args.file}_{label}_{args.suffix}", crImage)
+
+                    # for fbox5 in fBoxes5:
+                    #     cv2.rectangle(crImage5,
+                    #                   (fbox5.faceBox.p1.x, fbox5.faceBox.p1.y),
+                    #                   (fbox5.faceBox.p2.x, fbox5.faceBox.p2.y),
+                    #                   (255, 0, 0), 2)
+                    # cv2.imwrite(f"{args.file}_+{xi}x{yi}_{imgWStep}x{imgHStep}_5_{args.suffix}", crImage5)
+
+        for r in faceBoxes:
+            r.faceBox.p1.x += x0
+            r.faceBox.p1.y += y0
+            r.faceBox.p2.x += x0
+            r.faceBox.p2.y += y0
+        return faceBoxes
+
 
 # ------------------------------------------------------------------------------------------------
 if (__name__ == "__main__"):
     logger.info("Started")
-    faceImageProcessor = FacesImageProcessor()
 
+    faceImageProcessor = FacesImageProcessor()
     logger.info("Processing %s", args.file)
     image = cv2.imread(args.file)
-    pnt0 = [0, 0]
 
     (imageHeight, imageWidth, colorDepth) = image.shape
     logger.info("Image: %d x %d", imageWidth, imageHeight)
 
-    faceBoxes = faceImageProcessor.processImage(image)
-    for f in faceBoxes:
-        f.faceBox.p1.x += pnt0[0]
-        f.faceBox.p1.y += pnt0[0]
-        f.faceBox.p2.x += pnt0[0]
-        f.faceBox.p2.y += pnt0[0]
-    logger.info("Detection count: %d", len(faceBoxes))
+    faceBoxes = faceImageProcessor.processImage(image, (0, 0))
+    logger.info("RESULT : Detection count: %d", len(faceBoxes))
 
     for face in faceBoxes:
         (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-#        cv2.rectangle(image, (0, 0), (50, 50), (0, 0, 255), 2)
-
-    cv2.imwrite(args.file + args.suffix, image)
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
+    cv2.imwrite(f"{args.file}__RRR_{args.suffix}", image)
 
     sBody = json.dumps(
         faceBoxes,
