@@ -171,8 +171,8 @@ class FacesImageProcessor:
             self._embedder.setInput(theFaceBlob)
             faceVec = self._embedder.forward()
 
-            # logger.info(f"{args.file} faceVec: {faceVec}")
             if (args.debug):
+                logger.info(f"{args.file}_face_{i} faceVec: {faceVec}")
                 cv2.imwrite(f"{args.file}_face_{i}_{args.suffix}", theFace)
 
             # 2. convert faceBox to parent image
@@ -209,9 +209,10 @@ if (__name__ == "__main__"):
     sBody = json.dumps(
         faceBoxes,
         ensure_ascii=True,
+        indent=2,
         default=FaceDetection.jsonSerialize
     )
-    logger.info(sBody)
+    logger.info("sBody:\n" + sBody)
 
 # ------------------------------------------------------------------------------------------------------------------
 if (__name__ == "__main0__"):
