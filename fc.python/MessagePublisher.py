@@ -6,6 +6,7 @@ import math
 import random
 import socket
 import time
+import uuid
 
 import pika
 from pika.spec import BasicProperties
@@ -132,7 +133,8 @@ if "__main__" == __name__:
         "frameNo": random.randint(0, 1000),
         "localID": random.randint(100000, 999999),
         "timestamp": math.floor(now - random.randint(0, 60000)),
-        "brokerTimestamp": math.floor(now)
+        "brokerTimestamp": math.floor(now),
+        "uuid": str(uuid.uuid4())
     }
 
     msg = Message(headers=msgHeaders, file=msgFile)  # !!! -------------------------------------------------------------

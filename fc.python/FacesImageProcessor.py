@@ -7,6 +7,8 @@ import cv2
 
 from DataStruct import *
 
+import time
+start_time = time.time()
 # ------------------------------------------------------------------------------------------------
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger(__name__)
@@ -25,6 +27,11 @@ parser.add_argument(
     type=str,
     default="_dnn.jpeg",
     help="outfile suffix")
+parser.add_argument(
+    "--debug",
+    type=bool,
+    default=False,
+    help="Dump debug images and info")
 args = parser.parse_args()
 
 
@@ -120,7 +127,7 @@ class FacesImageProcessor:
         return faceBoxes1 + faceBoxes2
 
     def processImage(self, image, pntShift):
-        maxBox = (640, 480)
+        maxBox = (639, 460)
         (x0, y0) = pntShift
 
         (imageHeight, imageWidth, colorDepth) = image.shape
@@ -142,30 +149,16 @@ class FacesImageProcessor:
                     label = f"CROP_({xi}x{yi})-({x2}x{y2})"
                     logger.info(f"{args.file} {label} : %d faceBoxes", len(fBoxes2))
 
-                    # (x1, y1) = (xi + int(0.25 * imgWStep), yi + int(0.25 * imgHStep))
-                    # (x2, y2) = (xi + int(1.25 * imgWStep), yi + int(1.25 * imgHStep))
-                    # crImage5 = image[y1:y2, x1:x2]
-                    # fBoxes5 = self.processImage(crImage5, (x1, y1))
+                    if (args.debug):
+                        for fbox2 in fBoxes2:
+                            (rx1, ry1) = (fbox2.faceBox.p1.x-xi, fbox2.faceBox.p1.y-yi)
+                            (rx2, ry2) = (fbox2.faceBox.p2.x-xi, fbox2.faceBox.p2.y-yi)
+                            cv2.rectangle(crImage, (rx1, ry1), (rx2, ry2), (255, 0, 0), 2)
+                            logger.info(f"{args.file} Crop file: {label} box: ({rx1}, {ry1}), ({rx2}, {ry2})")
 
-                    # fBoxes2 += fBoxes5
-                    # faceBoxes += fBoxes5
-
-                    for fbox2 in fBoxes2:
-                        (rx1, ry1) = (fbox2.faceBox.p1.x-xi, fbox2.faceBox.p1.y-yi)
-                        (rx2, ry2) = (fbox2.faceBox.p2.x-xi, fbox2.faceBox.p2.y-yi)
-                        cv2.rectangle(crImage, (rx1, ry1), (rx2, ry2), (255, 0, 0), 2)
-                        logger.info(f"{args.file} Crop file: {label} box: ({rx1}, {ry1}), ({rx2}, {ry2})")
-
-                    cv2.rectangle(crImage, (0, 0), (25, 25), (255, 0, 255), -1)
-                    cv2.rectangle(crImage, (0, 0), (imgWStep, imgHStep), (255, 0, 255), 1)
-                    cv2.imwrite(f"{args.file}_{label}_{args.suffix}", crImage)
-
-                    # for fbox5 in fBoxes5:
-                    #     cv2.rectangle(crImage5,
-                    #                   (fbox5.faceBox.p1.x, fbox5.faceBox.p1.y),
-                    #                   (fbox5.faceBox.p2.x, fbox5.faceBox.p2.y),
-                    #                   (255, 0, 0), 2)
-                    # cv2.imwrite(f"{args.file}_+{xi}x{yi}_{imgWStep}x{imgHStep}_5_{args.suffix}", crImage5)
+                        cv2.rectangle(crImage, (0, 0), (25, 25), (255, 0, 255), -1)
+                        cv2.rectangle(crImage, (0, 0), (imgWStep, imgHStep), (255, 0, 255), 1)
+                        cv2.imwrite(f"{args.file}_{label}_{args.suffix}", crImage)
 
         for r in faceBoxes:
             r.faceBox.p1.x += x0
@@ -245,3 +238,5 @@ if (__name__ == "__main0__"):
             cv2.rectangle(image, (0, 0), (50, 50), (255, 0, 0), 2)
 
     cv2.imwrite(args.file + ".dnn.jpg", image)
+
+logger.info("%s : Execution time: --- %s seconds ---", args.file, (time.time() - start_time))
