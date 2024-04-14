@@ -217,6 +217,8 @@ class ImageProcessService():
         for face in faceBoxes:
             (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
             cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            face.faceIndex = cnt
+            cnt += 1
 
         # 3. Publish images data
         sendFrame(publisher, image, msgHeaders, headersOverride={

@@ -140,16 +140,18 @@ class FaceBox:
 
 # ----------------------------------------------------------------------------------------------------------------------
 class FaceDetection:
-    def __init__(self, detection=0.0, faceBox=None, faceVector=None, **kwargs):
+    def __init__(self, detection=0.0, faceBox=None, faceVector=None, faceIndex=0, **kwargs):
         super().__init__(**kwargs)
         self.detection = float(detection)
         self.faceBox = faceBox
         self.faceVector = faceVector
+        self.faceIndex = faceIndex
 
     @staticmethod
     def jsonSerialize(obj, **kwargs):
         if isinstance(obj, FaceDetection):
             return {
+                "faceIndex": obj.faceIndex,
                 "detection": float(obj.detection),
                 "faceBox": obj.faceBox,
                 "faceVector": obj.faceVector
