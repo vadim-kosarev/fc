@@ -183,7 +183,7 @@ class ImageProcessService():
         self._publisher = publisher
 
     # ------------------------------------------------------------------------------------------------------------------
-    def execute(self, image, msgHeaders):
+    def execute(self, image, msgHeaders, imgUUID):
 
         (imageHeight, imageWidth, colorDepth) = image.shape
         logger.info("Image: %d x %d", imageWidth, imageHeight)
@@ -196,8 +196,8 @@ class ImageProcessService():
 
         # 1. Publish binary image
         sendFrame(publisher, image, msgHeaders, headersOverride={
-            "uuid": str(uuid.uuid4()),
-            "parentUuid": str(imgUUID),
+            "uuid": str(imgUUID),
+            "messagey-type": "processed-frame",
             "frameNo": 0
         })
 
@@ -208,8 +208,9 @@ class ImageProcessService():
             aFaceFrame = image[y1:y2, x1:x2]
             sendFrame(publisher, aFaceFrame, msgHeaders, headersOverride={
                 "uuid": str(uuid.uuid4()),
+                "messagey-type": "processed-frame-face",
                 "parentUuid": str(imgUUID),
-                "frameNo": cnt
+                "faceNo": cnt
             })
             cv2.imwrite(F"{args.outdir}/{faceImageProcessor.label}_face_{cnt}.jpeg", aFaceFrame)
             cnt += 1
@@ -223,8 +224,9 @@ class ImageProcessService():
         # 3. Publish images data
         sendFrame(publisher, image, msgHeaders, headersOverride={
             "uuid": str(uuid.uuid4()),
+            "messagey-type": "processed-frame-faces",
             "parentUuid": str(imgUUID),
-            "frameNo": -1
+            "faceNo": -1
         })
 
         sBody = json.dumps(
@@ -234,6 +236,14 @@ class ImageProcessService():
             default=FaceDetection.jsonSerialize
         )
         logger.info("sBody:\n" + sBody)
+        publisher.publishMessage(
+            KEY_EXCHANGE_INDEXED_DATA,
+            msgHeaders.copy() | {
+                "messagey-type": "processed-frame-data",
+                "parentUuid": str(imgUUID),
+                "uuid": str(uuid.uuid4())
+            },
+            sBody)
 
         cv2.imwrite(F"{args.outdir}/{faceImageProcessor.label}__RRR_.jpeg", image)
 
@@ -262,7 +272,7 @@ if (__name__ == "__main__"):
         "uuid": str(imgUUID)
     }
 
-    processor.execute(image, msgHeaders)
+    processor.execute(image, msgHeaders, imgUUID)
 
 # ------------------------------------------------------------------------------------------------------------------
 if (__name__ == "__main0__"):
