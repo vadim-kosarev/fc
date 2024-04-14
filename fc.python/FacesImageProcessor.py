@@ -47,7 +47,7 @@ class FacesImageProcessor:
         self._faceDetector = cv2.dnn.readNetFromCaffe(self._prototxt, self._caffemodel)
         self._embedder = cv2.dnn.readNetFromTorch(self._torch)
         self.outdir = outdir
-        self.label = label
+        self.label = escapeHeader(label).replace("/", "#")
 
     # ------------------------------------------------------------------------------------------------------------------
     def processBlob(self, blob, shape):
@@ -135,12 +135,12 @@ class FacesImageProcessor:
                         for fbox2 in fBoxes2:
                             (rx1, ry1) = (fbox2.faceBox.p1.x - xi, fbox2.faceBox.p1.y - yi)
                             (rx2, ry2) = (fbox2.faceBox.p2.x - xi, fbox2.faceBox.p2.y - yi)
-                            cv2.rectangle(crImage, (rx1, ry1), (rx2, ry2), (255, 0, 0), 2)
+                            # cv2.rectangle(crImage, (rx1, ry1), (rx2, ry2), (255, 0, 0), 2)
                             logger.info(f"{self.label} Crop file: {label} box: ({rx1}, {ry1}), ({rx2}, {ry2})")
 
                         cv2.rectangle(crImage, (0, 0), (25, 25), (255, 0, 255), -1)
                         cv2.rectangle(crImage, (0, 0), (imgWStep, imgHStep), (255, 0, 255), 1)
-                        cv2.imwrite(f"{self.label}_{label}_{args.suffix}", crImage)
+                        # cv2.imwrite(f"{self.outdir}/{self.label}_{label}_{args.suffix}", crImage)
 
         i = 0
         for r in faceBoxes:
@@ -150,9 +150,10 @@ class FacesImageProcessor:
             self._embedder.setInput(theFaceBlob)
             faceVec = self._embedder.forward()
 
-            if (args.debug):
-                logger.info(f"{self.label}_face_{i} faceVec: {faceVec}")
-                cv2.imwrite(f"{self.outdir}/_face_{i}_{args.suffix}", theFace)
+            logger.info(f"{self.label}_face_{i} faceVec: {faceVec}")
+            # if (args.debug):
+            #     sss = f"{self.outdir}/{self.label}__face_{i}_{args.suffix}"
+            #     cv2.imwrite(sss, theFace)
 
             # 2. convert faceBox to parent image
             r.faceBox.p1.x += x0
@@ -176,10 +177,12 @@ def sendFrame(publisher, aFaceFrame, headers, headersOverride):
 # ======================================================================================================================
 class ImageProcessService():
 
+    # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, faceImageProcessor, publisher, **kwargs):
         self._faceImageProcessor = faceImageProcessor
         self._publisher = publisher
 
+    # ------------------------------------------------------------------------------------------------------------------
     def execute(self, image, msgHeaders):
 
         (imageHeight, imageWidth, colorDepth) = image.shape
@@ -203,16 +206,17 @@ class ImageProcessService():
         for face in faceBoxes:
             (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
             aFaceFrame = image[y1:y2, x1:x2]
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
-
             sendFrame(publisher, aFaceFrame, msgHeaders, headersOverride={
                 "uuid": str(uuid.uuid4()),
                 "parentUuid": str(imgUUID),
                 "frameNo": cnt
             })
-            # @TODO: save `aFaceFrame`
-
+            cv2.imwrite(F"{args.outdir}/{faceImageProcessor.label}_face_{cnt}.jpeg", aFaceFrame)
             cnt += 1
+        cnt = 0
+        for face in faceBoxes:
+            (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
         # 3. Publish images data
         sendFrame(publisher, image, msgHeaders, headersOverride={
@@ -221,8 +225,6 @@ class ImageProcessService():
             "frameNo": -1
         })
 
-        # @TODO: save resulting `image` (with faceBoxes)
-
         sBody = json.dumps(
             faceBoxes,
             ensure_ascii=True,
@@ -230,6 +232,8 @@ class ImageProcessService():
             default=FaceDetection.jsonSerialize
         )
         logger.info("sBody:\n" + sBody)
+
+        cv2.imwrite(F"{args.outdir}/{faceImageProcessor.label}__RRR_.jpeg", image)
 
 
 # ------------------------------------------------------------------------------------------------
