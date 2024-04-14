@@ -56,22 +56,44 @@ class MessageFile(DataValidState):
 
 
 # ======================================================================================================================
+def escapeHeader(strArg):
+    if str is None:
+        return "UNDEF"
+    strArg = str(strArg)
+    strArg = strArg.replace(":", "_#_")
+    strArg = strArg.replace("..", "_")
+    strArg = strArg.replace("\\", "/")
+    strArg = strArg.replace("//", "/")
+    return strArg
+
+def gets3Path(headers):
+    s3Path = "local/jpgdata/{}/{}/{}/frame_{}_{}_{}.jpg".format(
+        escapeHeader(headers["hostname"]),
+        escapeHeader(headers["source"]),
+        escapeHeader(headers["uuid"]),
+        escapeHeader(headers["timestamp"]),
+        escapeHeader(headers["frameNo"]),
+        escapeHeader(headers["localID"])
+    )
+    return s3Path
+
+
+# ======================================================================================================================
 class Message(DataValidState):
-    # ------------------------------------------------------------------------------------------------------------------
+
     def __init__(self, headers, file, **kwargs):
         super().__init__(**kwargs)
         self.headers = headers
         self.file = file
 
-    # ------------------------------------------------------------------------------------------------------------------
+
     def __repr__(self):
         return self.__str__()
 
-    # ------------------------------------------------------------------------------------------------------------------
+
     def __str__(self):
         return "\nHeaders= {}\nfile= {}".format(self.headers, self.file)
 
-    # ----------------------------------------------------------------------------------------------------------------------
     @staticmethod
     def jsonSerialize(obj, **kwargs):
         if isinstance(obj, Message):
@@ -96,13 +118,7 @@ class Message(DataValidState):
         return strArg
 
     def calculate(self):
-        s3Path = "local/jpgdata/{}/{}/frame_{}_{}_{}.jpg".format(
-            self.escapeHeader(self.headers["hostname"]),
-            self.escapeHeader(self.headers["source"]),
-            self.escapeHeader(self.headers["timestamp"]),
-            self.escapeHeader(self.headers["frameNo"]),
-            self.escapeHeader(self.headers["localID"])
-        )
+        s3Path = gets3Path(self.headers)
         self.headers['frameStoragePath'] = s3Path
 
 
@@ -122,6 +138,7 @@ class FaceBox:
         self.p2 = p2
 
 
+# ----------------------------------------------------------------------------------------------------------------------
 class FaceDetection:
     def __init__(self, detection=0.0, faceBox=None, faceVector=None, **kwargs):
         super().__init__(**kwargs)

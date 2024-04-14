@@ -1,42 +1,19 @@
-import argparse
 import enum
 import json
-import logging.config
 
 import cv2
 
-from DataStruct import *
+from ArgParser import *
+from MessagePublisher import *
 
-import time
 start_time = time.time()
 # ------------------------------------------------------------------------------------------------
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger(__name__)
 logger.info("Initialized")
 
-# ------------------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(
-    description='processes faces image')
-parser.add_argument(
-    "--file",
-    type=str,
-    default="out/input.jpg",
-    help="source file")
-parser.add_argument(
-    "--suffix",
-    type=str,
-    default="_dnn.jpeg",
-    help="outfile suffix")
-parser.add_argument(
-    "--debug",
-    type=bool,
-    default=False,
-    help="Dump debug images and info")
-args = parser.parse_args()
-
 
 # ------------------------------------------------------------------------------------------------
-
 class ProcResult(enum.Enum):
     OK = 0
     ERROR = -1
@@ -66,9 +43,11 @@ class FacesImageProcessor:
     _torch = "github.com/pyannote-data/openface.nn4.small2.v1.t7"
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, **kwargs):
+    def __init__(self, outdir, label, **kwargs):
         self._faceDetector = cv2.dnn.readNetFromCaffe(self._prototxt, self._caffemodel)
         self._embedder = cv2.dnn.readNetFromTorch(self._torch)
+        self.outdir = outdir
+        self.label = label
 
     # ------------------------------------------------------------------------------------------------------------------
     def processBlob(self, blob, shape):
@@ -134,7 +113,7 @@ class FacesImageProcessor:
         (x0, y0) = pntShift
 
         (imageHeight, imageWidth, colorDepth) = image.shape
-        logger.info(f"{args.file}... processing image of size %d x %d", imageWidth, imageHeight)
+        logger.info(f"{self.label}... processing image of size %d x %d", imageWidth, imageHeight)
         faceBoxes = self.processImage0(image)
 
         # ---- Crop and repeat
@@ -150,30 +129,30 @@ class FacesImageProcessor:
                     faceBoxes += fBoxes2
 
                     label = f"CROP_({xi}x{yi})-({x2}x{y2})"
-                    logger.info(f"{args.file} {label} : %d faceBoxes", len(fBoxes2))
+                    logger.info(f"{self.label} {label} : %d faceBoxes", len(fBoxes2))
 
                     if (args.debug):
                         for fbox2 in fBoxes2:
-                            (rx1, ry1) = (fbox2.faceBox.p1.x-xi, fbox2.faceBox.p1.y-yi)
-                            (rx2, ry2) = (fbox2.faceBox.p2.x-xi, fbox2.faceBox.p2.y-yi)
+                            (rx1, ry1) = (fbox2.faceBox.p1.x - xi, fbox2.faceBox.p1.y - yi)
+                            (rx2, ry2) = (fbox2.faceBox.p2.x - xi, fbox2.faceBox.p2.y - yi)
                             cv2.rectangle(crImage, (rx1, ry1), (rx2, ry2), (255, 0, 0), 2)
-                            logger.info(f"{args.file} Crop file: {label} box: ({rx1}, {ry1}), ({rx2}, {ry2})")
+                            logger.info(f"{self.label} Crop file: {label} box: ({rx1}, {ry1}), ({rx2}, {ry2})")
 
                         cv2.rectangle(crImage, (0, 0), (25, 25), (255, 0, 255), -1)
                         cv2.rectangle(crImage, (0, 0), (imgWStep, imgHStep), (255, 0, 255), 1)
-                        cv2.imwrite(f"{args.file}_{label}_{args.suffix}", crImage)
+                        cv2.imwrite(f"{self.label}_{label}_{args.suffix}", crImage)
 
         i = 0
         for r in faceBoxes:
             # 1. calculate 128-D vector
             theFace = image[r.faceBox.p1.y:r.faceBox.p2.y, r.faceBox.p1.x:r.faceBox.p2.x]
-            theFaceBlob = cv2.dnn.blobFromImage(theFace, 1./255., (96,96), (0,0,0), swapRB=True, crop=False)
+            theFaceBlob = cv2.dnn.blobFromImage(theFace, 1. / 255., (96, 96), (0, 0, 0), swapRB=True, crop=False)
             self._embedder.setInput(theFaceBlob)
             faceVec = self._embedder.forward()
 
             if (args.debug):
-                logger.info(f"{args.file}_face_{i} faceVec: {faceVec}")
-                cv2.imwrite(f"{args.file}_face_{i}_{args.suffix}", theFace)
+                logger.info(f"{self.label}_face_{i} faceVec: {faceVec}")
+                cv2.imwrite(f"{self.outdir}/_face_{i}_{args.suffix}", theFace)
 
             # 2. convert faceBox to parent image
             r.faceBox.p1.x += x0
@@ -187,32 +166,97 @@ class FacesImageProcessor:
         return faceBoxes
 
 
+def sendFrame(publisher, aFaceFrame, headers, headersOverride):
+    msgHeaders = headers.copy() | headersOverride
+    msgHeaders['s3Path'] = gets3Path(msgHeaders)
+    retval, jpegImage = cv2.imencode(".jpg", aFaceFrame)
+    publisher.publishMessage(KEY_EXCHANGE_INDEXED_IMAGES, msgHeaders, jpegImage.tobytes())
+
+
+# ======================================================================================================================
+class ImageProcessService():
+
+    def __init__(self, faceImageProcessor, publisher, **kwargs):
+        self._faceImageProcessor = faceImageProcessor
+        self._publisher = publisher
+
+    def execute(self, image, msgHeaders):
+
+        (imageHeight, imageWidth, colorDepth) = image.shape
+        logger.info("Image: %d x %d", imageWidth, imageHeight)
+
+        faceBoxes = faceImageProcessor.processImage(image, (0, 0))
+        logger.info("RESULT : Detection count: %d", len(faceBoxes))
+
+        if len(faceBoxes) <= 0:
+            return
+
+        # 1. Publish binary image
+        sendFrame(publisher, image, msgHeaders, headersOverride={
+            "uuid": str(uuid.uuid4()),
+            "parentUuid": str(imgUUID),
+            "frameNo": 0
+        })
+
+        # 2. Publish faces
+        cnt = 0
+        for face in faceBoxes:
+            (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
+            aFaceFrame = image[y1:y2, x1:x2]
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
+
+            sendFrame(publisher, aFaceFrame, msgHeaders, headersOverride={
+                "uuid": str(uuid.uuid4()),
+                "parentUuid": str(imgUUID),
+                "frameNo": cnt
+            })
+            # @TODO: save `aFaceFrame`
+
+            cnt += 1
+
+        # 3. Publish images data
+        sendFrame(publisher, image, msgHeaders, headersOverride={
+            "uuid": str(uuid.uuid4()),
+            "parentUuid": str(imgUUID),
+            "frameNo": -1
+        })
+
+        # @TODO: save resulting `image` (with faceBoxes)
+
+        sBody = json.dumps(
+            faceBoxes,
+            ensure_ascii=True,
+            indent=2,
+            default=FaceDetection.jsonSerialize
+        )
+        logger.info("sBody:\n" + sBody)
+
+
 # ------------------------------------------------------------------------------------------------
 if (__name__ == "__main__"):
-    logger.info("Started")
+    imgUUID = uuid.uuid4()
+    now = time.time()
+    imgTimestamp = int(now - random.randint(0, 60000))  # @TODO: get timestamp from Exif
 
-    faceImageProcessor = FacesImageProcessor()
+    faceImageProcessor = FacesImageProcessor(args.outdir, args.file)
+    publisher = RabbitMQClient()
+    processor = ImageProcessService(faceImageProcessor, publisher)
+
     logger.info("Processing %s", args.file)
+
+    # Received data
     image = cv2.imread(args.file)
+    msgHeaders = {
+        "hostname": socket.gethostname(),
+        "source": args.file,
+        "frameNo": 0,
+        "localID": random.randint(100000, 999999),
+        "timestamp": imgTimestamp,
+        "brokerTimestamp": int(now),
+        "uuid": str(imgUUID)
+    }
 
-    (imageHeight, imageWidth, colorDepth) = image.shape
-    logger.info("Image: %d x %d", imageWidth, imageHeight)
-
-    faceBoxes = faceImageProcessor.processImage(image, (0, 0))
-    logger.info("RESULT : Detection count: %d", len(faceBoxes))
-
-    for face in faceBoxes:
-        (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
-    cv2.imwrite(f"{args.file}__RRR_{args.suffix}", image)
-
-    sBody = json.dumps(
-        faceBoxes,
-        ensure_ascii=True,
-        indent=2,
-        default=FaceDetection.jsonSerialize
-    )
-    logger.info("sBody:\n" + sBody)
+    processor.execute(image, msgHeaders)
 
 # ------------------------------------------------------------------------------------------------------------------
 if (__name__ == "__main0__"):

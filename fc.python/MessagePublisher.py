@@ -1,6 +1,4 @@
-import argparse
 import configparser
-import json
 import logging.config
 import math
 import random
@@ -12,6 +10,7 @@ import pika
 from pika.spec import BasicProperties
 
 from DataStruct import *
+import ArgParser
 
 # ------------------------------------------------------------------------------------------------
 config = configparser.ConfigParser()
@@ -29,22 +28,13 @@ KEY_IMAGES_ROUTING_KEY = "images_routing_key"
 KEY_MESSAGE_BROKER_NAME = "message_broker_name"
 KEY_MESSAGE_BROKER_CLASS = "message_broker_class"
 
+KEY_EXCHANGE_INDEXED_IMAGES = "x_indexed_image"
+KEY_EXCHANGE_INDEXED_DATA = "x_indexed_data"
+
 # ------------------------------------------------------------------------------------------------
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger(__name__)
 logger.info("Initialized")
-
-# ------------------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(
-    description='Publish image message')
-parser.add_argument(
-    "-f",
-    "--file",
-    type=str,
-    default="../data/dflt_image.jpg",
-    help="Source file")
-args = parser.parse_args()
-
 
 # ======================================================================================================================
 class MQClient:
@@ -54,7 +44,7 @@ class MQClient:
         logger.info("Created: %s", self.description)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def publishMessage(self, msg):
+    def publishMessage(self, exchangeKey, headers, body):
         return
 
 
@@ -78,21 +68,16 @@ class RabbitMQClient(MQClient):
         return
 
     # ------------------------------------------------------------------------------------------------------------------
-    def publishMessage(self, message):
-        message.ensureValid()
+    def publishMessage(self, exchangeKey, headers, body):
         props = BasicProperties(
-            headers=message.headers
+            headers=headers
         )
-        sBody = json.dumps(
-            message,
-            ensure_ascii=True,
-            indent=2,
-            default=Message.jsonSerialize)
+
         self._channel.basic_publish(
-            exchange=config.get(SECT_BROKER, KEY_IMAGES_EXCHANGE),
+            exchange=config.get(SECT_BROKER, exchangeKey),
             routing_key=config.get(SECT_BROKER, KEY_IMAGES_ROUTING_KEY),
             properties=props,
-            body=sBody
+            body=body
         )
 
 
@@ -105,7 +90,7 @@ class KafkaClient(MQClient):
         logger.info("Created")
 
     # ------------------------------------------------------------------------------------------------------------------
-    def publishMessage(self, msg):
+    def publishMessage(self, exchangeKey, headers, body):
         logger.info("publishMessage")
         super().publishMessage(msg)
 
