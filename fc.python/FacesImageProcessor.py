@@ -151,9 +151,6 @@ class FacesImageProcessor:
             faceVec = self._embedder.forward()
 
             logger.info(f"{self.label}_face_{i} faceVec: {faceVec}")
-            # if (args.debug):
-            #     sss = f"{self.outdir}/{self.label}__face_{i}_{args.suffix}"
-            #     cv2.imwrite(sss, theFace)
 
             # 2. convert faceBox to parent image
             r.faceBox.p1.x += x0
@@ -217,7 +214,7 @@ class ImageProcessService():
         cnt = 0
         for face in faceBoxes:
             (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 1)
             face.faceIndex = cnt
             cnt += 1
 
@@ -226,7 +223,7 @@ class ImageProcessService():
             "uuid": str(uuid.uuid4()),
             "messagey-type": "processed-frame-faces",
             "parentUuid": str(imgUUID),
-            "faceNo": -1
+            "faceNo": None
         })
 
         sBody = json.dumps(
@@ -275,48 +272,5 @@ if (__name__ == "__main__"):
     processor.execute(image, msgHeaders, imgUUID)
 
 # ------------------------------------------------------------------------------------------------------------------
-if (__name__ == "__main0__"):
-
-    logger.info("Started")
-    obj = FacesImageProcessor()
-
-    face_detector = cv2.dnn.readNetFromCaffe(args.prototxt, args.caffeModel)
-
-    logger.info("Processing %s", args.file)
-    image = cv2.imread(args.file)
-    (imageHeight, imageWidth, colorBytes) = image.shape
-    logger.info("Image: %d x %d", imageWidth, imageHeight)
-    blob = cv2.dnn.blobFromImage(
-        image
-        , scalefactor=1.
-        , size=(300, 300)
-        , mean=[104, 117, 123],
-        swapRB=False, crop=False
-    )
-
-    face_detector.setInput(blob)
-    detections = face_detector.forward()
-
-    detCount = detections.shape[2]
-    logger.info("Detection count: %d", detCount)
-
-    for i in range(0, detCount):
-        detection = detections[0, 0, i, 2]
-        min = detections.min
-        max = detections.max
-        if (detection > 0.5):
-            xx1 = detections[0, 0, i, 3]
-            yy1 = detections[0, 0, i, 4]
-            xx2 = detections[0, 0, i, 5]
-            yy2 = detections[0, 0, i, 6]
-            x1 = int(xx1 * imageWidth)
-            y1 = int(yy1 * imageHeight)
-            x2 = int(xx2 * imageWidth)
-            y2 = int(yy2 * imageHeight)
-            logger.info("bbox: (%d,%d) - (%d,%d))", x1, y1, x2, y2)
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.rectangle(image, (0, 0), (50, 50), (255, 0, 0), 2)
-
-    cv2.imwrite(args.file + ".dnn.jpg", image)
 
 logger.info("%s : Execution time: --- %s seconds ---", args.file, (time.time() - start_time))
