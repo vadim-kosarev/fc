@@ -67,13 +67,14 @@ def escapeHeader(strArg):
     return strArg
 
 def gets3Path(headers):
-    s3Path = "local/jpgdata/{}/{}/{}/frame_{}_{}_{}.jpg".format(
-        escapeHeader(headers["hostname"]),
-        escapeHeader(headers["source"]),
-        escapeHeader(headers["uuid"]),
-        escapeHeader(headers["timestamp"]),
-        escapeHeader(headers["frameNo"]),
-        escapeHeader(headers["localID"])
+    s3Path = "{}/{}/{}/{}/frame_{}_{}_{}.jpg".format(
+        escapeHeader(headers.get("hostname")),
+        escapeHeader(headers.get("source")),
+        escapeHeader(headers.get("parentUuid")),
+        escapeHeader(headers.get("uuid")),
+        escapeHeader(headers.get("timestamp")),
+        escapeHeader(headers.get("frameNo")),
+        escapeHeader(headers.get("localID"))
     )
     return s3Path
 

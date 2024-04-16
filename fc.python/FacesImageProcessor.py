@@ -193,8 +193,8 @@ class ImageProcessService():
 
         # 1. Publish binary image
         sendFrame(publisher, image, msgHeaders, headersOverride={
-            "uuid": str(imgUUID),
-            "messagey-type": "processed-frame",
+            KEY_UUID: str(imgUUID),
+            KEY_MESSAGE_TYPE: "processed-frame",
             "frameNo": 0
         })
 
@@ -204,9 +204,9 @@ class ImageProcessService():
             (x1, y1), (x2, y2) = (face.faceBox.p1.x, face.faceBox.p1.y), (face.faceBox.p2.x, face.faceBox.p2.y)
             aFaceFrame = image[y1:y2, x1:x2]
             sendFrame(publisher, aFaceFrame, msgHeaders, headersOverride={
-                "uuid": str(uuid.uuid4()),
-                "messagey-type": "processed-frame-face",
-                "parentUuid": str(imgUUID),
+                KEY_UUID: str(uuid.uuid4()),
+                KEY_MESSAGE_TYPE: "processed-frame-face",
+                KEY_PARENT_UUID: str(imgUUID),
                 "faceNo": cnt
             })
             cv2.imwrite(F"{args.outdir}/{faceImageProcessor.label}_face_{cnt}.jpeg", aFaceFrame)
@@ -220,9 +220,9 @@ class ImageProcessService():
 
         # 3. Publish images data
         sendFrame(publisher, image, msgHeaders, headersOverride={
-            "uuid": str(uuid.uuid4()),
-            "messagey-type": "processed-frame-faces",
-            "parentUuid": str(imgUUID),
+            KEY_UUID: str(uuid.uuid4()),
+            KEY_MESSAGE_TYPE: "processed-frame-faces",
+            KEY_PARENT_UUID: str(imgUUID),
             "faceNo": None
         })
 
@@ -236,9 +236,9 @@ class ImageProcessService():
         publisher.publishMessage(
             KEY_EXCHANGE_INDEXED_DATA,
             msgHeaders.copy() | {
-                "messagey-type": "processed-frame-data",
-                "parentUuid": str(imgUUID),
-                "uuid": str(uuid.uuid4())
+                KEY_MESSAGE_TYPE: "processed-frame-data",
+                KEY_PARENT_UUID: str(imgUUID),
+                KEY_UUID: str(uuid.uuid4())
             },
             sBody)
 

@@ -31,6 +31,10 @@ KEY_MESSAGE_BROKER_CLASS = "message_broker_class"
 KEY_EXCHANGE_INDEXED_IMAGES = "x_indexed_image"
 KEY_EXCHANGE_INDEXED_DATA = "x_indexed_data"
 
+KEY_UUID = "uuid"
+KEY_PARENT_UUID = "parentUuid"
+KEY_MESSAGE_TYPE = "message-type"
+
 # ------------------------------------------------------------------------------------------------
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger(__name__)
